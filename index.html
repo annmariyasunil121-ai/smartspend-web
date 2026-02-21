@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Finance Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+        :root {
+            --bg: #f8f6f3;
+            --surface: #fffefb;
+            --border: rgba(41,37,36,0.08);
+            --muted: #78716c;
+            --ink: #1c1917;
+            --accent: #b45309;
+            --accent-soft: #fef3c7;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+            min-height: 100vh;
+            font-weight: 400;
+            letter-spacing: 0.01em;
+        }
+        .font-display { font-family: 'Poppins', sans-serif; }
+        .heatmap-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+        .heatmap-cell { width: 100%; aspect-ratio: 1; border-radius: 8px; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .heatmap-cell:hover { transform: scale(1.06); box-shadow: 0 6px 16px rgba(0,0,0,0.08); }
+        .lvl-0 { background: linear-gradient(145deg, #dcfce7, #bbf7d0); }
+        .lvl-1 { background: linear-gradient(145deg, #86efac, #4ade80); }
+        .lvl-2 { background: linear-gradient(145deg, #fef08a, #facc15); }
+        .lvl-3 { background: linear-gradient(145deg, #fdba74, #fb923c); }
+        .lvl-4 { background: linear-gradient(145deg, #f87171, #dc2626); }
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            transition: box-shadow 0.4s ease, transform 0.3s ease, border-color 0.3s ease;
+        }
+        .card:hover {
+            box-shadow: 0 24px 48px -16px rgba(28,25,23,0.06);
+            border-color: rgba(41,37,36,0.12);
+            transform: translateY(-2px);
+        }
+        .btn-glow { transition: box-shadow 0.3s ease, transform 0.2s ease; }
+        .btn-glow:hover { box-shadow: 0 8px 24px -4px rgba(180,83,9,0.25); transform: translateY(-1px); }
+        .btn-glow:active { transform: translateY(0); }
+        .fab {
+            position: fixed; bottom: 28px; right: 28px;
+            width: 56px; height: 56px; border-radius: 50%;
+            border: none;
+            background: linear-gradient(145deg, #b45309, #92400e);
+            color: white;
+            font-size: 26px; font-weight: 300; line-height: 1;
+            cursor: pointer;
+            box-shadow: 0 8px 28px rgba(180,83,9,0.35);
+            transition: box-shadow 0.3s ease, transform 0.2s ease;
+            z-index: 50;
+        }
+        .fab:hover { box-shadow: 0 12px 36px rgba(180,83,9,0.45); transform: scale(1.06); }
+        .fab:active { transform: scale(0.98); }
+        #confetti-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; }
+    </style>
+</head>
+<body class="p-5 md:p-10 text-stone-800 antialiased">
+
+    <canvas id="confetti-canvas" aria-hidden="true"></canvas>
+
+    <div class="max-w-5xl mx-auto rounded-3xl overflow-hidden" style="background: var(--surface); box-shadow: 0 4px 24px rgba(28,25,23,0.06); border: 1px solid var(--border);">
+        
+        <header class="px-6 md:px-10 py-8 md:py-10 flex flex-col md:flex-row justify-between items-center gap-4" style="background: linear-gradient(160deg, #1c1917 0%, #292524 100%); color: #fafaf9;">
+            <div>
+                <h1 class="font-display text-3xl md:text-4xl font-semibold tracking-tight text-amber-50/95">Smart Finance Planner</h1>
+                <p class="text-stone-400 mt-1.5 text-sm font-medium" id="monthDisplay">Month: Feb 2026</p>
+            </div>
+        </header>
+
+        <div class="px-6 py-4 flex flex-wrap gap-3 justify-center md:justify-start" style="background: #fafaf9; border-bottom: 1px solid var(--border);">
+            <button id="resetMonthBtn" class="btn-glow px-4 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-stone-200" style="background: #f5f5f4; color: #57534e;">Reset Month</button>
+            <button id="archiveMonthBtn" class="btn-glow px-4 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-stone-200" style="background: #f5f5f4; color: #57534e;">Archive Month</button>
+            <button id="resetAllBtn" class="btn-glow px-4 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-red-100" style="background: #fef2f2; color: #b91c1c;">Reset All Data</button>
+        </div>
+
+        <div class="p-6 md:p-10">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5 mb-10">
+                <div class="card p-5 md:p-6 rounded-2xl">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-emerald-600/90">Income</p>
+                    <p class="font-display text-2xl md:text-3xl font-semibold text-stone-800 mt-1" id="summaryIncome">₹0</p>
+                </div>
+                <div class="card p-5 md:p-6 rounded-2xl">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-rose-600/90">Expense</p>
+                    <p class="font-display text-2xl md:text-3xl font-semibold text-stone-800 mt-1" id="summaryExpense">₹0</p>
+                </div>
+                <div class="card p-5 md:p-6 rounded-2xl">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-amber-700/90">Savings</p>
+                    <p class="font-display text-2xl md:text-3xl font-semibold text-stone-800 mt-1" id="summarySavings">₹0</p>
+                </div>
+                <div class="card p-5 md:p-6 rounded-2xl">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-stone-500">Risk Profile</p>
+                    <p class="font-display text-2xl md:text-3xl font-semibold text-stone-800 mt-1" id="summaryRisk">—</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                <div class="lg:col-span-2 space-y-6">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div class="card rounded-2xl p-5 md:p-6">
+                            <h3 class="font-display font-semibold text-lg text-stone-800 mb-3">Monthly Income</h3>
+                            <div class="flex gap-2 mb-2">
+                                <input type="number" id="incomeInput" class="flex-1 rounded-xl px-3 py-2.5 border text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/50 transition" placeholder="Amount" style="border-color: var(--border);">
+                                <button id="incomeAddBtn" class="btn-glow px-4 py-2.5 rounded-xl font-medium text-white" style="background: linear-gradient(145deg, #b45309, #92400e);">Add</button>
+                            </div>
+                            <button id="editIncomeBtn" class="text-sm font-medium text-amber-800 hover:underline">Edit Income</button>
+                        </div>
+                        <div class="card rounded-2xl p-5 md:p-6">
+                            <h3 class="font-display font-semibold text-lg text-stone-800 mb-3">Fixed Cost (Rent / EMI)</h3>
+                            <div class="flex gap-2">
+                                <input type="number" id="fixedCostInput" class="flex-1 rounded-xl px-3 py-2.5 border text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/50 transition" placeholder="Amount" style="border-color: var(--border);">
+                                <button id="fixedCostBtn" class="btn-glow px-4 py-2.5 rounded-xl font-medium text-white" style="background: linear-gradient(145deg, #b45309, #92400e);">Set</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div id="addExpenseSection" class="card rounded-2xl p-5 md:p-6">
+                            <h3 class="font-display font-semibold text-lg text-stone-800 mb-3 flex items-center gap-2">
+                                <span class="w-7 h-7 rounded-full flex items-center justify-center text-sm font-medium text-rose-600" style="background: #fef2f2;">+</span> Add Expense
+                            </h3>
+                            <div class="space-y-3">
+                                <input type="number" id="expenseAmount" placeholder="Amount" class="w-full rounded-xl px-3 py-2.5 border text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-rose-400/40 transition" style="border-color: var(--border);">
+                                <input type="date" id="expenseDate" class="w-full rounded-xl px-3 py-2.5 border text-stone-600 focus:outline-none focus:ring-2 focus:ring-amber-500/40 transition" style="border-color: var(--border);">
+                                <select id="expenseCategory" class="w-full rounded-xl px-3 py-2.5 border bg-white text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-500/40 transition" style="border-color: var(--border);">
+                                    <option>Food</option>
+                                    <option>Travel</option>
+                                    <option>Shopping</option>
+                                    <option>Rent</option>
+                                    <option>Utilities</option>
+                                    <option>Other</option>
+                                </select>
+                                <button id="addExpenseBtn" class="btn-glow w-full py-2.5 rounded-xl font-medium text-white" style="background: linear-gradient(145deg, #b91c1c, #991b1b);">Add Expense</button>
+                            </div>
+                        </div>
+
+                        <div class="card rounded-2xl p-5 md:p-6">
+                            <h3 class="font-display font-semibold text-lg text-stone-800 mb-3">Set Category Limit</h3>
+                            <div class="space-y-3">
+                                <select id="limitCategory" class="w-full rounded-xl px-3 py-2.5 border bg-white text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-500/40 transition" style="border-color: var(--border);">
+                                    <option>Food</option>
+                                    <option>Travel</option>
+                                    <option>Shopping</option>
+                                    <option>Rent</option>
+                                    <option>Utilities</option>
+                                    <option>Other</option>
+                                </select>
+                                <input type="number" id="limitAmount" placeholder="Limit (₹)" class="w-full rounded-xl px-3 py-2.5 border text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40 transition" style="border-color: var(--border);">
+                                <button id="setLimitBtn" class="btn-glow w-full py-2.5 rounded-xl font-medium text-white" style="background: #292524;">Set Limit</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card rounded-2xl p-5 md:p-6" style="background: linear-gradient(145deg, #fffbeb 0%, #fef3c7 100%); border-color: rgba(180,83,9,0.2);">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-display font-semibold text-xl text-amber-900">Dream Goal</h3>
+                            <button id="goalToggleEdit" class="btn-glow text-xs font-medium px-3 py-1.5 rounded-lg border border-amber-300 text-amber-800 hover:bg-amber-50 transition" style="background: #fffbeb;">Toggle Edit</button>
+                        </div>
+                        <p class="text-xs text-amber-800/90 mb-4">Funded from <strong>savings</strong> only — not from income.</p>
+                        <div class="flex flex-col md:flex-row gap-3">
+                            <input type="text" id="goalName" placeholder="Goal name" class="rounded-xl px-3 py-2.5 border border-amber-200/80 bg-white/80 text-amber-900 placeholder-amber-600/60 focus:outline-none focus:ring-2 focus:ring-amber-500/40">
+                            <input type="number" id="goalAmount" placeholder="Target amount (₹)" class="rounded-xl px-3 py-2.5 border border-amber-200/80 bg-white/80 text-amber-900 placeholder-amber-600/60 focus:outline-none focus:ring-2 focus:ring-amber-500/40">
+                        </div>
+                        <div id="goalDisplayWrap" class="mt-4 hidden">
+                            <div class="h-2.5 rounded-full overflow-hidden mb-2.5" style="background: rgba(180,83,9,0.2);">
+                                <div id="goalProgressBar" class="h-full rounded-full transition-all duration-500" style="width:0%; background: linear-gradient(90deg, #d97706, #b45309);"></div>
+                            </div>
+                            <p id="goalDisplayText" class="text-sm text-amber-900/95"></p>
+                        </div>
+                        <div class="mt-4 flex gap-2">
+                            <button id="setGoalBtn" class="btn-glow px-4 py-2 rounded-xl font-medium text-white" style="background: linear-gradient(145deg, #b45309, #92400e);">Set Goal</button>
+                            <button id="modifyGoalBtn" class="btn-glow px-4 py-2 rounded-xl font-medium border border-amber-400 text-amber-800 hover:bg-amber-50 transition" style="background: #fffbeb;">Modify Goal</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    
+                    <div class="card rounded-2xl p-5 md:p-6 text-white border-0" style="background: linear-gradient(160deg, #292524 0%, #1c1917 100%);">
+                        <h3 class="font-display font-semibold text-lg mb-4 text-stone-200">Achievements</h3>
+                        <div id="achievementList" class="space-y-3 mb-4">
+                            <div class="flex items-center gap-3 p-3 rounded-xl" style="background: rgba(255,255,255,0.06);">
+                                <span class="text-3xl w-10 h-10 flex items-center justify-center rounded-lg flex-shrink-0" id="achievementBadge" style="background: rgba(255,255,255,0.1);">🌱</span>
+                                <div class="min-w-0">
+                                    <p class="font-semibold text-stone-100" id="achievementTitle">Starter</p>
+                                    <p class="text-xs text-stone-400" id="achievementDesc">Save to unlock badges</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center pt-4 mt-2" style="border-top: 1px solid rgba(255,255,255,0.08);">
+                            <div class="text-center">
+                                <p class="text-2xl">🔥</p>
+                                <p class="font-semibold text-stone-100" id="streakCount">0</p>
+                                <p class="text-xs text-stone-400">Streak (months)</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-2xl">⭐</p>
+                                <p class="font-semibold text-stone-100" id="xpCount">0</p>
+                                <p class="text-xs text-stone-400">XP</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card rounded-2xl p-5 md:p-6">
+                        <h3 class="font-display font-semibold text-lg mb-2 text-stone-800">Spending Chart</h3>
+                        <p class="text-sm text-stone-600 mb-4 p-3 rounded-xl" id="topCategoryTip" style="background: #fafaf9;">Add expenses to see spending by category</p>
+                        <div class="w-full h-40 mb-4">
+                            <canvas id="expenseChart"></canvas>
+                        </div>
+                        <div class="p-3 rounded-xl mt-4" style="background: #fefce8; border: 1px solid #fef08a;">
+                            <p class="text-xs font-semibold uppercase tracking-wider mb-1 text-amber-900/80">Insights</p>
+                            <p class="text-sm text-amber-900/95" id="insightsText">Add income and expenses to get insights.</p>
+                        </div>
+                    </div>
+
+                    <div class="card rounded-2xl p-5 md:p-6">
+                        <h3 class="font-display font-semibold text-base text-stone-800 mb-3">Spending Heatmap</h3>
+                        <div class="heatmap-grid" id="heatmap">
+                            </div>
+                        <div class="flex justify-between items-center mt-2 text-xs text-slate-500">
+                            <span class="text-green-600 font-medium">Low spending</span>
+                            <div class="flex gap-1">
+                                <div class="w-3 h-3 lvl-0 rounded-sm"></div>
+                                <div class="w-3 h-3 lvl-1 rounded-sm"></div>
+                                <div class="w-3 h-3 lvl-2 rounded-sm"></div>
+                                <div class="w-3 h-3 lvl-3 rounded-sm"></div>
+                                <div class="w-3 h-3 lvl-4 rounded-sm"></div>
+                            </div>
+                            <span class="text-red-600 font-medium">High spending</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button type="button" id="fab" class="fab" title="Add expense" aria-label="Add expense">+</button>
+
+    <script>
+        const STORAGE_KEY = 'smartFinanceData';
+        const CATEGORIES = ['Food', 'Travel', 'Shopping', 'Rent', 'Utilities', 'Other'];
+
+        function getCurrentMonthKey() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        function getMonthLabel(key) {
+            const [y, m] = key.split('-');
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            return `${months[parseInt(m, 10) - 1]} ${y}`;
+        }
+
+        let state = {
+            currentMonth: getCurrentMonthKey(),
+            income: 0,
+            fixedCost: 0,
+            expenses: [],
+            categoryLimits: {},
+            goal: { name: '', amount: 0 },
+            archived: {},
+            streak: 0,
+            totalXP: 0
+        };
+
+        function loadState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    state = { ...state, ...parsed };
+                    if (!state.expenses) state.expenses = [];
+                    if (!state.categoryLimits) state.categoryLimits = {};
+                    if (!state.archived) state.archived = {};
+                    if (!state.goal) state.goal = { name: '', amount: 0 };
+                }
+            } catch (e) {}
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            } catch (e) {}
+        }
+
+        function getMonthData() {
+            const key = state.currentMonth;
+            if (state.archived[key]) return state.archived[key];
+            return {
+                income: state.income,
+                fixedCost: state.fixedCost,
+                expenses: state.expenses.filter(e => e.month === key),
+                categoryLimits: { ...state.categoryLimits }
+            };
+        }
+
+        function ensureCurrentMonth() {
+            const key = getCurrentMonthKey();
+            if (state.currentMonth !== key) {
+                state.currentMonth = key;
+                state.income = 0;
+                state.fixedCost = 0;
+                state.expenses = state.expenses.filter(e => e.month === key);
+                saveState();
+            }
+        }
+
+        function totalExpense() {
+            const key = state.currentMonth;
+            return state.expenses
+                .filter(e => e.month === key)
+                .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+        }
+
+        function savings() {
+            return Math.max(0, (Number(state.income) || 0) - (Number(state.fixedCost) || 0) - totalExpense());
+        }
+
+        function riskProfile() {
+            const inc = Number(state.income) || 0;
+            if (inc <= 0) return '—';
+            const sav = savings();
+            const ratio = sav / inc;
+            if (ratio >= 0.3) return 'Low';
+            if (ratio >= 0.1) return 'Medium';
+            if (ratio > 0) return 'High';
+            return 'Critical';
+        }
+
+        function updateSummary() {
+            document.getElementById('summaryIncome').textContent = '₹' + (state.income || 0);
+            document.getElementById('summaryExpense').textContent = '₹' + totalExpense();
+            document.getElementById('summarySavings').textContent = '₹' + savings();
+            document.getElementById('summaryRisk').textContent = riskProfile();
+        }
+
+        function updateMonthDisplay() {
+            document.getElementById('monthDisplay').textContent = 'Month: ' + getMonthLabel(state.currentMonth);
+        }
+
+        function addIncome() {
+            const val = Number(document.getElementById('incomeInput').value) || 0;
+            if (val <= 0) return;
+            state.income = (Number(state.income) || 0) + val;
+            document.getElementById('incomeInput').value = '';
+            saveState();
+            updateSummary();
+            updateGoalProgress();
+            checkConfetti();
+        }
+
+        function setFixedCost() {
+            const val = Number(document.getElementById('fixedCostInput').value) || 0;
+            state.fixedCost = Math.max(0, val);
+            saveState();
+            updateSummary();
+            updateGoalProgress();
+        }
+
+        function getOverLimitCategories() {
+            const byCat = {};
+            state.expenses
+                .filter(e => e.month === state.currentMonth)
+                .forEach(e => { byCat[e.category] = (byCat[e.category] || 0) + (Number(e.amount) || 0); });
+            return Object.entries(state.categoryLimits || {}).filter(([cat, limit]) => (byCat[cat] || 0) > limit);
+        }
+
+        function playLimitBeep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const playTone = (startTime, freq) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = freq;
+                    osc.type = 'sine';
+                    gain.gain.setValueAtTime(0.25, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.2);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.2);
+                };
+                playTone(ctx.currentTime, 800);
+                playTone(ctx.currentTime + 0.3, 800);
+            } catch (e) {}
+        }
+
+        function showLimitExceededAlert() {
+            const byCat = {};
+            state.expenses
+                .filter(e => e.month === state.currentMonth)
+                .forEach(e => { byCat[e.category] = (byCat[e.category] || 0) + (Number(e.amount) || 0); });
+            const overLimit = Object.entries(state.categoryLimits || {}).filter(([cat, limit]) => (byCat[cat] || 0) > limit);
+            if (overLimit.length === 0) return;
+            playLimitBeep();
+            const lines = overLimit.map(([cat, limit]) => {
+                const spent = byCat[cat] || 0;
+                return `• ${cat}: ₹${spent} spent (limit ₹${limit})`;
+            });
+            alert('⚠️ Category limit exceeded!\n\n' + lines.join('\n'));
+        }
+
+        function addExpense() {
+            const amount = Number(document.getElementById('expenseAmount').value) || 0;
+            const date = document.getElementById('expenseDate').value;
+            const category = document.getElementById('expenseCategory').value;
+            if (amount <= 0 || !date) return;
+            state.expenses.push({
+                amount,
+                date,
+                category,
+                month: state.currentMonth
+            });
+            document.getElementById('expenseAmount').value = '';
+            document.getElementById('expenseDate').value = new Date().toISOString().slice(0, 10);
+            saveState();
+            updateSummary();
+            renderGoalDisplay();
+            updateChart();
+            updateHeatmap();
+            updateInsights();
+            updateTopCategoryTip();
+            updateAchievements();
+            if (getOverLimitCategories().length > 0) {
+                showLimitExceededAlert();
+            }
+            checkConfetti();
+        }
+
+        function setCategoryLimit() {
+            const category = document.getElementById('limitCategory').value;
+            const limit = Number(document.getElementById('limitAmount').value) || 0;
+            if (limit > 0) {
+                state.categoryLimits[category] = limit;
+                document.getElementById('limitAmount').value = '';
+                saveState();
+                const overLimit = getOverLimitCategories();
+                if (overLimit.some(([c]) => c === category)) {
+                    showLimitExceededAlert();
+                }
+                updateInsights();
+            }
+        }
+
+        function setGoal() {
+            const name = document.getElementById('goalName').value.trim();
+            const amount = Number(document.getElementById('goalAmount').value) || 0;
+            if (name && amount > 0) {
+                state.goal = { name, amount };
+                saveState();
+                renderGoalDisplay();
+            }
+        }
+
+        function modifyGoal() {
+            if (state.goal?.name) {
+                document.getElementById('goalName').value = state.goal.name;
+                document.getElementById('goalAmount').value = state.goal.amount;
+            }
+        }
+
+        function updateGoalProgress() {
+            renderGoalDisplay();
+        }
+
+        function renderGoalDisplay() {
+            const wrap = document.getElementById('goalDisplayWrap');
+            const bar = document.getElementById('goalProgressBar');
+            const text = document.getElementById('goalDisplayText');
+            if (!state.goal?.name || !state.goal?.amount) {
+                if (wrap) wrap.classList.add('hidden');
+                return;
+            }
+            if (wrap) wrap.classList.remove('hidden');
+            const sav = savings();
+            const amount = state.goal.amount;
+            const fromSavings = Math.min(sav, amount);
+            const pct = amount > 0 ? Math.min(100, Math.round((fromSavings / amount) * 100)) : 0;
+            if (bar) {
+                bar.style.width = pct + '%';
+            }
+            if (text) {
+                text.innerHTML = `<span class="font-medium">${state.goal.name}</span> — From savings: <strong>₹${fromSavings}</strong> / ₹${amount} target (${pct}%)`;
+            }
+        }
+
+        let goalEditVisible = true;
+        function toggleGoalEdit() {
+            goalEditVisible = !goalEditVisible;
+            document.getElementById('goalName').disabled = !goalEditVisible;
+            document.getElementById('goalAmount').disabled = !goalEditVisible;
+        }
+
+        function resetMonth() {
+            state.income = 0;
+            state.fixedCost = 0;
+            state.expenses = state.expenses.filter(e => e.month !== state.currentMonth);
+            document.getElementById('incomeInput').value = '';
+            document.getElementById('fixedCostInput').value = '';
+            saveState();
+            updateSummary();
+            updateChart();
+            updateHeatmap();
+            updateInsights();
+            updateTopCategoryTip();
+            updateAchievements();
+        }
+
+        function archiveMonth() {
+            const key = state.currentMonth;
+            state.archived[key] = {
+                income: state.income,
+                fixedCost: state.fixedCost,
+                expenses: state.expenses.filter(e => e.month === key),
+                categoryLimits: { ...state.categoryLimits }
+            };
+            state.income = 0;
+            state.fixedCost = 0;
+            state.expenses = state.expenses.filter(e => e.month !== key);
+            state.currentMonth = getCurrentMonthKey();
+            saveState();
+            updateMonthDisplay();
+            updateSummary();
+            updateChart();
+            updateHeatmap();
+            updateInsights();
+            updateAchievements();
+        }
+
+        function resetAllData() {
+            if (!confirm('Delete all data (income, expenses, goals, archives)?')) return;
+            state = {
+                currentMonth: getCurrentMonthKey(),
+                income: 0,
+                fixedCost: 0,
+                expenses: [],
+                categoryLimits: {},
+                goal: { name: '', amount: 0 },
+                archived: {},
+                streak: 0,
+                totalXP: 0
+            };
+            saveState();
+            document.getElementById('incomeInput').value = '';
+            document.getElementById('fixedCostInput').value = '';
+            document.getElementById('goalName').value = '';
+            document.getElementById('goalAmount').value = '';
+            updateMonthDisplay();
+            updateSummary();
+            updateChart();
+            updateHeatmap();
+            updateInsights();
+            updateTopCategoryTip();
+            updateAchievements();
+        }
+
+        let expenseChart = null;
+        function updateChart() {
+            const byCat = {};
+            CATEGORIES.forEach(c => { byCat[c] = 0; });
+            state.expenses
+                .filter(e => e.month === state.currentMonth)
+                .forEach(e => { byCat[e.category] = (byCat[e.category] || 0) + (Number(e.amount) || 0); });
+            const labels = [];
+            const data = [];
+            const colors = ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280'];
+            Object.entries(byCat).forEach(([cat, val], i) => {
+                if (val > 0) {
+                    labels.push(cat);
+                    data.push(val);
+                }
+            });
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            if (expenseChart) expenseChart.destroy();
+            expenseChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels.length ? labels : ['No data'],
+                    datasets: [{
+                        data: data.length ? data : [1],
+                        backgroundColor: data.length ? colors.slice(0, data.length) : ['#e5e7eb'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'right' } }
+                }
+            });
+        }
+
+        function updateHeatmap() {
+            const daysInMonth = new Date(
+                parseInt(state.currentMonth.slice(0, 4), 10),
+                parseInt(state.currentMonth.slice(5, 7), 10),
+                0
+            ).getDate();
+            const byDay = {};
+            for (let d = 1; d <= daysInMonth; d++) byDay[d] = 0;
+            state.expenses
+                .filter(e => e.month === state.currentMonth && e.date)
+                .forEach(e => {
+                    const day = parseInt(e.date.slice(8, 10), 10);
+                    if (day >= 1 && day <= daysInMonth) byDay[day] = (byDay[day] || 0) + (Number(e.amount) || 0);
+                });
+            const maxSpend = Math.max(1, ...Object.values(byDay));
+            const heatmap = document.getElementById('heatmap');
+            heatmap.innerHTML = '';
+            for (let d = 1; d <= daysInMonth; d++) {
+                const cell = document.createElement('div');
+                const val = byDay[d] || 0;
+                const level = maxSpend > 0 ? Math.min(4, Math.floor((val / maxSpend) * 5)) : 0;
+                cell.className = `heatmap-cell lvl-${level}`;
+                cell.title = `Day ${d}: ₹${val} spent`;
+                heatmap.appendChild(cell);
+            }
+        }
+
+        function updateTopCategoryTip() {
+            const byCat = {};
+            state.expenses.filter(e => e.month === state.currentMonth).forEach(e => {
+                byCat[e.category] = (byCat[e.category] || 0) + (Number(e.amount) || 0);
+            });
+            const top = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0];
+            const el = document.getElementById('topCategoryTip');
+            el.innerHTML = top ? `💡 You spend most on <strong>${top[0]}</strong> 💰` : '💡 Add expenses to see spending by category';
+        }
+
+        function updateInsights() {
+            const exp = state.expenses.filter(e => e.month === state.currentMonth);
+            const now = new Date();
+            const twoWeeksAgo = new Date(now);
+            twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+            const recent = exp.filter(e => new Date(e.date) >= twoWeeksAgo);
+            const total = totalExpense();
+            const inc = Number(state.income) || 0;
+            const byCat = {};
+            exp.forEach(e => { byCat[e.category] = (byCat[e.category] || 0) + (Number(e.amount) || 0); });
+            const overLimit = Object.entries(state.categoryLimits || {}).filter(([cat, limit]) => (byCat[cat] || 0) > limit);
+            let text = 'Add income and expenses to get insights.';
+            if (overLimit.length > 0) {
+                text = '⚠️ Over limit: ' + overLimit.map(([c]) => c).join(', ') + '.';
+            } else if (exp.length > 0) {
+                if (recent.length === 0) text = 'No spending in last two weeks — great control!';
+                else if (inc > 0 && total / inc > 0.8) text = 'Spending is high relative to income. Consider cutting non-essentials.';
+                else if (savings() > 0) text = 'You\'re saving this month. Keep it up!';
+                else text = `Total expenses this month: ₹${total}. Try setting category limits.`;
+            }
+            document.getElementById('insightsText').textContent = text;
+        }
+
+        const SAVING_BADGES = [
+            { minRatio: 0.5, badge: '👑', title: 'Legend', desc: 'Saved 50%+ of income' },
+            { minRatio: 0.4, badge: '🏆', title: 'Elite Saver', desc: 'Saved 40%+ of income' },
+            { minRatio: 0.3, badge: '💎', title: 'Super Saver', desc: 'Saved 30%+ of income' },
+            { minRatio: 0.2, badge: '💰', title: 'Smart Saver', desc: 'Saved 20%+ of income' },
+            { minRatio: 0.1, badge: '📊', title: 'Budget Pro', desc: 'Saved 10%+ of income' },
+            { minRatio: 0.001, badge: '🌱', title: 'Saver', desc: 'You\'re saving this month' },
+            { minRatio: -1, badge: '🌱', title: 'Starter', desc: 'Add income & save to earn badges' }
+        ];
+
+        function getSavingsXP() {
+            const sav = savings();
+            const inc = Number(state.income) || 0;
+            const ratio = inc > 0 && sav >= 0 ? Math.min(1, sav / inc) : 0;
+            return Math.round(ratio * 500);
+        }
+
+        function updateAchievements() {
+            const sav = savings();
+            const inc = Number(state.income) || 0;
+            const ratio = inc > 0 ? sav / inc : 0;
+            const tier = SAVING_BADGES.find(t => ratio >= t.minRatio) || SAVING_BADGES[SAVING_BADGES.length - 1];
+            document.getElementById('achievementBadge').textContent = tier.badge;
+            document.getElementById('achievementTitle').textContent = tier.title;
+            document.getElementById('achievementDesc').textContent = tier.desc;
+            document.getElementById('streakCount').textContent = state.streak || 0;
+            document.getElementById('xpCount').textContent = getSavingsXP();
+        }
+
+        function setDefaultDate() {
+            document.getElementById('expenseDate').value = new Date().toISOString().slice(0, 10);
+        }
+
+        function playClickSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = 520;
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.08, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.06);
+            } catch (e) {}
+        }
+
+        function fireConfetti() {
+            const canvas = document.getElementById('confetti-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            const colors = ['#6366f1','#22c55e','#eab308','#ef4444','#ec4899','#8b5cf6'];
+            const particles = [];
+            for (let i = 0; i < 120; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: -(4 + Math.random() * 6),
+                    size: 4 + Math.random() * 6,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    rotation: Math.random() * 360,
+                    rotSpeed: (Math.random() - 0.5) * 10
+                });
+            }
+            let lastT = null;
+            function step(t) {
+                const dt = lastT != null ? Math.min((t - lastT) / 1000, 0.05) : 0.016;
+                lastT = t;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 14 * dt;
+                    p.rotation += p.rotSpeed * dt;
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.rotation * Math.PI / 180);
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+                    ctx.restore();
+                });
+                if (particles.every(p => p.y > canvas.height + 20)) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    return;
+                }
+                requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+        }
+
+        function checkConfetti() {
+            const inc = Number(state.income) || 0;
+            const sav = savings();
+            const exp = totalExpense();
+            if (inc > 0 && sav >= inc * 0.3 && exp <= inc * 0.4) {
+                fireConfetti();
+            }
+        }
+
+        (function init() {
+            loadState();
+            ensureCurrentMonth();
+            updateMonthDisplay();
+            updateSummary();
+            document.getElementById('fixedCostInput').value = state.fixedCost || '';
+            renderGoalDisplay();
+            updateChart();
+            updateHeatmap();
+            updateInsights();
+            updateTopCategoryTip();
+            updateAchievements();
+            setDefaultDate();
+            document.getElementById('incomeAddBtn').addEventListener('click', addIncome);
+            document.getElementById('editIncomeBtn').addEventListener('click', () => {
+                const v = prompt('Enter new total income for this month', state.income);
+                if (v !== null && !isNaN(parseFloat(v))) {
+                    state.income = Math.max(0, parseFloat(v));
+                    saveState();
+                    updateSummary();
+                    updateGoalProgress();
+                }
+            });
+            document.getElementById('fixedCostBtn').addEventListener('click', setFixedCost);
+            document.getElementById('addExpenseBtn').addEventListener('click', addExpense);
+            document.getElementById('setLimitBtn').addEventListener('click', setCategoryLimit);
+            document.getElementById('setGoalBtn').addEventListener('click', setGoal);
+            document.getElementById('modifyGoalBtn').addEventListener('click', modifyGoal);
+            document.getElementById('goalToggleEdit').addEventListener('click', toggleGoalEdit);
+            document.getElementById('resetMonthBtn').addEventListener('click', resetMonth);
+            document.getElementById('archiveMonthBtn').addEventListener('click', archiveMonth);
+            document.getElementById('resetAllBtn').addEventListener('click', resetAllData);
+
+            document.getElementById('fab').addEventListener('click', function() {
+                document.getElementById('addExpenseSection').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('button')) playClickSound();
+            });
+        })();
+    </script>
+</body>
+</html>
