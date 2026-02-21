@@ -143,15 +143,18 @@ Or double-click the file.
 ## Screenshots (Add your actual images)
 
 ```markdown
-<img width="1920" height="1080" alt="Screenshot 2026-02-21 073058" src="https://github.com/user-attachments/assets/9858053a-2be2-48b5-8b25-cf156bad6825" />
+<img width="1920" height="1080" alt="Screenshot 2026-02-21 073058" src="https://github.com/user-attachments/assets/9d3e3d2b-23a9-4709-bfca-3da9c5056df1" />
+
 
 Main dashboard showing income, expense, savings and risk profile.
 
-<img width="1920" height="1080" alt="Screenshot 2026-02-21 073354" src="https://github.com/user-attachments/assets/3aea1d40-6494-4fba-b9e4-8278b1551c92" />
+<img width="426" height="490" alt="Screenshot 2026-02-21 073837" src="https://github.com/user-attachments/assets/0c82da26-8a8f-4510-8fce-23f558bab1b6" />
+
 
 Doughnut chart visualizing category-wise spending.
 
-<img width="426" height="795" alt="image" src="https://github.com/user-attachments/assets/e17e1068-99d7-438f-be11-e1a0a7e0784e" />
+<img width="400" height="361" alt="Screenshot 2026-02-21 084736" src="https://github.com/user-attachments/assets/31a4d804-5331-445d-b775-8f189e802110" />
+
 
 Daily spending heatmap visualization.
 ```
